@@ -2,36 +2,42 @@
 import asyncio
 import websockets
 import json
-from connect4 import PLAYER1, PLAYER2
-async def handler(websocket):
-    for player, column, row in [
-            (PLAYER1, 3, 0),
-            (PLAYER2, 3, 1),
-            (PLAYER1, 4, 0),
-            (PLAYER2, 4, 1),
-            (PLAYER1, 2, 0),
-            (PLAYER2, 1, 0),
-            (PLAYER1, 5, 0),]:
-        event = {
-            "type": "play",
-            "player": player,
-            "column": column,
-            "row": row,
-        }
-        await websocket.send(json.dumps(event))
-        await asyncio.sleep(0.5)
-    event = {
-        "type": "win",
-        "player": PLAYER1,
-    }
-    await websocket.send(json.dumps(event))
+from connect4 import PLAYER1, PLAYER2, Connect4
 
-#    while (True):
-#        try:
-#            message = await websocket.recv()
-#        except websockets.ConnectionClosedOK:
-#            break
-#        print(message)
+async def handler(websocket):
+    # Initialize a Connect Four game
+    game = Connect4()
+    async for message in websocket:
+        event = json.loads(message)
+
+        if event["type"] != "play":
+            await websocket.send("wrong event type")
+            continue
+
+        currentRow = 0;
+        currentColumn = event["column"]
+        currentPlayer = PLAYER1 if game.last_player == PLAYER2 else PLAYER2
+
+        try:
+            currentRow = game.play(currentPlayer, event["column"])
+        except RuntimeError as e:
+            await websocket.send(str(e))
+            continue
+
+        if game.last_player_won:
+            response = {
+                    "type": "win",
+                    "player": game.last_player
+            }
+            await websocket.send(json.dumps(response))
+        else:
+            response = {
+                    "type": "play",
+                    "player": game.last_player,
+                    "column": str(currentColumn),
+                    "row": str(currentRow)
+            }
+            await websocket.send(json.dumps(response))
 
 async def main():
     async with websockets.serve(handler, "", 8001):

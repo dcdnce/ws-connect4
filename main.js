@@ -42,8 +42,8 @@ function receivesMoves(board, websocket) {
 				showMessage(`Player ${event.player} wins!`);
 				// close the WebSocket connection.
 				websocket.close(1000);
-			break;
-				case "error":
+				break;
+			case "error":
 				showMessage(event.message);
 				break;
 		  default:
