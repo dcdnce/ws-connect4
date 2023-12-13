@@ -8,9 +8,17 @@ window.addEventListener("DOMContentLoaded", () => {
 	// Open the WebSocket connection 
 	const websocket = new WebSocket("ws://localhost:8001/");
 	// Register event handlers
+	initGame(websocket);
 	sendMoves(board, websocket);
 	receivesMoves(board, websocket);
 });
+
+function initGame(websocket) {
+	websocket.addEventListener("open", () => {
+		const event = {type: "init"};
+		websocket.send(JSON.stringify(event));
+	});
+}
 
 function sendMoves(board, websocket) {
 	// When clicking a column, send a "play" event for a move in that column.
@@ -34,6 +42,10 @@ function receivesMoves(board, websocket) {
 	websocket.addEventListener("message", ({ data }) => {
 		const event = JSON.parse(data);
 		switch (event.type) {
+			case "init":
+				// Create link for inviting the second player.
+    			document.querySelector(".join").href = "?join=" + event.join;
+			    break;
 			case "play":
 				// Update the UI with the move.
 				playMove(board, event.player, event.column, event.row);
