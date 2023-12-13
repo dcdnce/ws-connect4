@@ -7,6 +7,13 @@ from connect4 import PLAYER1, PLAYER2, Connect4
 
 JOIN = {}
 
+async def error(websocket, message):
+    event = {
+        "type": "error",
+        "message": message,
+    }
+    await websocket.send(json.dumps(event))
+
 async def start(websocket):
     # Init game inst
     game = Connect4()
@@ -22,22 +29,12 @@ async def start(websocket):
             "join": join_key,
         }
         await websocket.send(json.dumps(event))
-
-        # Temporary - for testing.
-        print("first player started game", id(game))
-        async for message in websocket:
-            print("first player sent", message)
+        
+        # Game loop
+        await play(websocket, game, PLAYER1, connected)
 
     finally:
         del JOIN[join_key]
-
-
-async def error(websocket, message):
-    event = {
-        "type": "error",
-        "message": message,
-    }
-    await websocket.send(json.dumps(event))
 
 async def join(websocket, join_key):
     # Find the Connect Four game.
@@ -52,13 +49,11 @@ async def join(websocket, join_key):
     connected.add(websocket)
 
     try:
-        # Temporary - for testing.
-        print("second player joined game", id(game))
-        async for message in websocket:
-            print("second player sent", message)
+        await play(websocket, game, PLAYER2, connected)
 
     finally:
         connected.remove(websocket)
+
 
 async def handler(websocket):
     # Receive and parse the "init" event from the UI.
@@ -72,39 +67,41 @@ async def handler(websocket):
         await join(websocket, event["join"])
     else:
         await start(websocket)
-#    # Initialize a Connect Four game
-#    game = Connect4()
-#    async for message in websocket:
-#        event = json.loads(message)
-#
-#        if event["type"] != "play":
-#            await websocket.send("wrong event type")
-#            continue
-#
-#        currentRow = 0;
-#        currentColumn = event["column"]
-#        currentPlayer = PLAYER1 if game.last_player == PLAYER2 else PLAYER2
-#
-#        try:
-#            currentRow = game.play(currentPlayer, event["column"])
-#        except RuntimeError as e:
-#            await websocket.send(str(e))
-#            continue
-#
-#        if game.last_player_won:
-#            response = {
-#                    "type": "win",
-#                    "player": game.last_player
-#            }
-#            await websocket.send(json.dumps(response))
-#        else:
-#            response = {
-#                    "type": "play",
-#                    "player": game.last_player,
-#                    "column": str(currentColumn),
-#                    "row": str(currentRow)
-#            }
-#            await websocket.send(json.dumps(response))
+
+async def play(websocket, game, player, connected):
+    async for message in websocket:
+        event = json.loads(message)
+
+        if event["type"] != "play":
+            await error(websocket, "Wrong event type.")
+            continue
+
+        currentRow = 0;
+        currentColumn = event["column"]
+
+        try:
+            currentRow = game.play(player, event["column"])
+        except RuntimeError as e:
+            await websocket.send(str(e))
+            continue
+
+        if game.last_player_won:
+            response = {
+                    "type": "win",
+                    "player": game.last_player
+            }
+            for ws in connected:
+                await ws.send(json.dumps(response));
+            return ;
+        else:
+            response = {
+                    "type": "play",
+                    "player": game.last_player,
+                    "column": str(currentColumn),
+                    "row": str(currentRow)
+            }
+            for ws in connected:
+                await ws.send(json.dumps(response));
 
 async def main():
     async with websockets.serve(handler, "", 8001):
