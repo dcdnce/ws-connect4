@@ -31,15 +31,47 @@ async def start(websocket):
     finally:
         del JOIN[join_key]
 
+
+async def error(websocket, message):
+    event = {
+        "type": "error",
+        "message": message,
+    }
+    await websocket.send(json.dumps(event))
+
+async def join(websocket, join_key):
+    # Find the Connect Four game.
+    try:
+        game, connected = JOIN[join_key]
+    except KeyError:
+        print(join_key)
+        await error(websocket, "Game not found.")
+        return
+
+    # Register to receive moves from this game.
+    connected.add(websocket)
+
+    try:
+        # Temporary - for testing.
+        print("second player joined game", id(game))
+        async for message in websocket:
+            print("second player sent", message)
+
+    finally:
+        connected.remove(websocket)
+
 async def handler(websocket):
     # Receive and parse the "init" event from the UI.
     message = await websocket.recv()
     event = json.loads(message)
     assert event["type"] == "init"
 
+    # Second player joins an existing game.
     # First player starts a new game.
-    await start(websocket)
-
+    if "join" in event:
+        await join(websocket, event["join"])
+    else:
+        await start(websocket)
 #    # Initialize a Connect Four game
 #    game = Connect4()
 #    async for message in websocket:

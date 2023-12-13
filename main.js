@@ -14,10 +14,18 @@ window.addEventListener("DOMContentLoaded", () => {
 });
 
 function initGame(websocket) {
-	websocket.addEventListener("open", () => {
-		const event = {type: "init"};
-		websocket.send(JSON.stringify(event));
-	});
+  websocket.addEventListener("open", () => {
+    // Send an "init" event according to who is connecting.
+    const params = new URLSearchParams(window.location.search);
+    let event = { type: "init" };
+    if (params.has("join")) {
+      // Second player joins an existing game.
+      event.join = params.get("join");
+    } else {
+      // First player starts a new game.
+    }
+    websocket.send(JSON.stringify(event));
+  });
 }
 
 function sendMoves(board, websocket) {
